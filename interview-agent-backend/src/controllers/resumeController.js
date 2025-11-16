@@ -5,6 +5,7 @@ import { parseImage } from "../utils/imageParser.js";
 import path from "path";
 import { storeResumeInFaiss } from "../rag/ingestResumeFaiss.js";
 import { sanitizeText } from "../utils/sanitize.js";
+import { resetFaissIndex } from "../rag/faissIndex.js";
 
 export const handleResumeUpload = async (req, res) => {
   try {
@@ -27,9 +28,22 @@ export const handleResumeUpload = async (req, res) => {
       return res.status(400).json({ error: "Unsupported file type" });
     }
 
+    const sanitizedText = sanitizeText(extractedText);
+
+    resetFaissIndex();
+
+    // 4️⃣ Ingest into vector DB
+    const result = await storeResumeInFaiss(
+      sanitizedText,
+      req.body.userId || "user1"
+    );
+
+    // 5️⃣ Respond immediately
     res.json({
-      message: "Resume parsed successfully",
-      text: extractedText,
+      message: "Resume uploaded, extracted and stored successfully",
+      extractedText, // send back for UI display if needed
+      sanitizedText, // optional
+      chunksStored: result.totalChunks,
     });
   } catch (err) {
     console.error("Error:", err);
@@ -46,6 +60,7 @@ export const processResume = async (req, res) => {
     }
 
     const sanitizedText = sanitizeText(text);
+    resetFaissIndex();
 
     const result = await storeResumeInFaiss(sanitizedText, userId || "user1");
 
